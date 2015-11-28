@@ -379,29 +379,29 @@ def in1d(ar1, ar2, assume_unique=False, invert=False):
                 mask |= (ar1 == a)
         return mask
 
-    # Otherwise use sorting
-    if not assume_unique:
-        ar1, rev_idx = np.unique(ar1, return_inverse=True)
-        ar2 = np.unique(ar2)
+    arr = np.r_[ar1, ar2]
+    if arr.size == 0:
+        return np.empty(0, dtype=np.bool)
 
-    ar = np.concatenate((ar1, ar2))
-    # We need this to be a stable sort, so always use 'mergesort'
-    # here. The values from the first array should always come before
-    # the values from the second array.
-    order = ar.argsort(kind='mergesort')
-    sar = ar[order]
-    if invert:
-        bool_ar = (sar[1:] != sar[:-1])
-    else:
-        bool_ar = (sar[1:] == sar[:-1])
-    flag = np.concatenate((bool_ar, [invert]))
-    ret = np.empty(ar.shape, dtype=bool)
-    ret[order] = flag
+    size = arr.size
+    half = ar1.size
+    perm = np.argsort(arr)
 
-    if assume_unique:
-        return ret[:len(ar1)]
-    else:
-        return ret[rev_idx]
+    rev = np.empty(size, dtype=np.intp)
+    rev[perm] = np.arange(size, dtype=np.intp)
+
+    arr = arr[perm]
+    idx = np.nonzero(np.r_[True, arr[1:] != arr[:-1]])[0]
+
+    mask = np.zeros(size, dtype=np.bool)
+    mask[rev[half:]] = True
+    mask = np.logical_or.reduceat(mask, idx)
+
+    rep = np.diff(np.r_[idx, size])
+    out = np.repeat(mask, rep)[rev[:half]]
+
+    return ~out if invert else out
+
 
 def union1d(ar1, ar2):
     """
